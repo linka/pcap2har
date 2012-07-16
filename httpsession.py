@@ -3,15 +3,28 @@ Objects for parsing a list of HTTPFlows into data suitable for writing to a
 HAR file.
 '''
 
-from datetime import datetime
 import dpkt
 import logging as log
+
+from datetime import datetime
 
 from pcaputil import ms_from_timedelta, ms_from_dpkt_time
 from pagetracker import PageTracker
 import http
 import settings
 
+class HttpErrorRecord(object):
+    """ Error that happens while processing HTTP session """
+    def __init__(self, internal_error):
+        self.timestamp = datetime.now()
+        self.internal_error = internal_error
+    
+    def __repr__(self):
+        return "HttpErrorRecord(timestamp='%s', internal_error='%s')" % \
+            (str(self.timestamp), self.internal_error) 
+    def __str__(self):
+        return self.__repr__()
+        
 class Entry:
     '''
     represents an HTTP request/response in a form suitable for writing to a HAR
@@ -122,18 +135,21 @@ class HttpSession(object):
     * flows = [http.Flow]
     * entries = [Entry], all http request/response pairs
     '''
-    def __init__(self, packetdispatcher):
+    def __init__(self, packetdispatcher, drop_response_bodies=False):
         '''
         parses http.flows from packetdispatcher, and parses those for HAR info
         '''
+        self.errors = []
         # parse http flows
         self.flows= []
         for flow in packetdispatcher.tcp.flowdict.itervalues():
             try:
-                self.flows.append(http.Flow(flow))
+                self.flows.append(http.Flow(flow, drop_response_bodies))
             except http.Error as error:
+                self.errors.append(HttpErrorRecord(error))
                 log.warning(error)
             except dpkt.dpkt.Error as error:
+                self.errors.append(HttpErrorRecord(error))
                 log.warning(error)
         # combine the messages into a list
         pairs = reduce(lambda p, f: p+f.pairs, self.flows, [])

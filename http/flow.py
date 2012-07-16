@@ -16,14 +16,18 @@ class Flow:
     Members:
     pairs = [MessagePair], where ei
     '''
-    def __init__(self, tcpflow):
+    def __init__(self, tcpflow, drop_response_bodies):
         '''
         tcpflow = tcp.Flow
         '''
         # try parsing it with forward as request dir
-        success, requests, responses = parse_streams(tcpflow.fwd, tcpflow.rev)
+        success, requests, responses = parse_streams(tcpflow.fwd, 
+                                                     tcpflow.rev, 
+                                                     drop_response_bodies)
         if not success:
-            success, requests, responses = parse_streams(tcpflow.rev, tcpflow.fwd)
+            success, requests, responses = parse_streams(tcpflow.rev, 
+                                                         tcpflow.fwd, 
+                                                         drop_response_bodies)
             if not success:
                 # flow is not HTTP
                 raise HTTPError('TCP Flow does not contain HTTP')
@@ -65,7 +69,7 @@ class MessagePair:
         self.request = request
         self.response = response
 
-def gather_messages(MessageClass, tcpdir):
+def gather_messages(MessageClass, tcpdir, spec_args=None):
     '''
     Attempts to construct a series of MessageClass objects from the data. The
     basic idea comes from pyper's function, HTTPFlow.analyze.gather_messages.
@@ -83,11 +87,13 @@ def gather_messages(MessageClass, tcpdir):
     '''
     messages = [] # [MessageClass]
     pointer = 0 # starting index of data that MessageClass should look at
+    if spec_args is None: spec_args = []
+
     # while there's data left
     while pointer < len(tcpdir.data):
         curr_data = tcpdir.data[pointer:pointer+200] # debug var
         try:
-            msg = MessageClass(tcpdir, pointer)
+            msg = MessageClass(tcpdir, pointer, *spec_args)
         except dpkt.Error as error: # if the message failed
             if pointer == 0: # if this is the first message
                 raise http.Error('Invalid http')
@@ -101,7 +107,7 @@ def gather_messages(MessageClass, tcpdir):
         pointer += msg.data_consumed
     return messages
 
-def parse_streams(request_stream, response_stream):
+def parse_streams(request_stream, response_stream, drop_response_bodies):
     '''
     attempts to construct http.Request/Response's from the corresponding
     passed streams. Failure may either mean that the streams are malformed or
@@ -115,7 +121,7 @@ def parse_streams(request_stream, response_stream):
     '''
     try:
         requests = gather_messages(Request, request_stream)
-        responses = gather_messages(Response, response_stream)
+        responses = gather_messages(Response, response_stream, [drop_response_bodies])
     except dpkt.UnpackError as e:
         print 'failed to parse http: ', e
         return False, None, None

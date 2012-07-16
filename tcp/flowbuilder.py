@@ -32,7 +32,7 @@ class FlowBuilder:
             log.warning('hpvroom packets are ignored')
             return
         if(srcport == 443 or dstport == 443):
-            log.warning('https packets are ignored')
+            log.warning('HTTPS packets are ignored')
             return
         # sort it into a tcp.Flow in flowdict
         if (src, dst) in self.flowdict:

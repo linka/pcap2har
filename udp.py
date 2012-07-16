@@ -29,4 +29,4 @@ class Processor:
             except dpkt.Error:
                 log.warning('UDP packet on port 53 was not DNS')
         else:
-            log.warning('unkown UDP ports: %d->%d' % (pkt.sport, pkt.dport))
+            log.debug('Unknown UDP ports: %d->%d' % (pkt.sport, pkt.dport))

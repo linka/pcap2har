@@ -118,6 +118,9 @@ class SortedCollection(object):
             getattr(self._key, '__name__', repr(self._key))
         )
 
+    def __delitem__(self, index):
+        self.remove(index)
+
     def index(self, item):
         '''Find the position of an item.  Raise a ValueError if not found'''
         key = self._key(item)

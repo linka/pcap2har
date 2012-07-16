@@ -103,7 +103,7 @@ class Direction:
             log.warn('tried to clear data on an unfinished tcp.Direction')
         # clear the list, to make sure all chunks are orphaned to make it
         # easier for GC. hopefully.
-        self.chunks.clear()
+        del self.chunks[:]
         self.chunks = None
         self.final_data_chunk = None
 

@@ -32,7 +32,7 @@ class Response(message.Message):
     * compression_amount: int or None, difference between lengths of
       uncompressed data and raw data. None if no compression or we're not sure
     '''
-    def __init__(self, tcpdir, pointer):
+    def __init__(self, tcpdir, pointer, drop_bodies=None):
         message.Message.__init__(self, tcpdir, pointer, dpkt_http.Response)
         # get mime type
         if 'content-type' in self.msg.headers:
@@ -46,7 +46,8 @@ class Response(message.Message):
         self.compression_amount = None
         self.text = None
         # handle body stuff
-        if settings.drop_bodies:
+        if (drop_bodies is not None and drop_bodies) or \
+           (drop_bodies is None and settings.drop_bodies): 
             self.clear_body()
         else:
             # uncompress body if necessary
@@ -64,7 +65,7 @@ class Response(message.Message):
         '''
         self.body = self.raw_body = None
         self.msg.body = None
-        self.tcpdir.clear_data() # clear stream data, not timing, etc
+        #self.tcpdir.clear_data() # clear stream data, not timing, etc
 
     def handle_compression(self):
         '''
