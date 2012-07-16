@@ -23,9 +23,7 @@ class Page(object):
         self.user_agent = entry.request.msg.headers.get('user-agent')
         # url, title, etc.
         if is_root_doc:
-            self.root_document = entry
-            self.url = entry.request.url
-            self.title = self.url
+            mark_page_as_root(self, entry)
         else:
             # if this is a hanging referrer
             if 'referer' in entry.request.msg.headers:
@@ -57,6 +55,14 @@ default_page_timings = {
     'onContentLoad': -1,
     'onLoad': -1
 }
+
+def mark_page_as_root(page, entry):
+    '''
+    Marks the page object as root: adds url, root document and title.
+    '''
+    page.root_document = entry
+    page.url = entry.request.url
+    page.title = page.url
 
 def is_root_document(entry):
     '''
@@ -100,7 +106,14 @@ class PageTracker(object):
                 if page.user_agent != user_agent:
                     continue
             # check referrers
+            url = req.url
             if referrer and page.has_referrer(referrer):
+                matched_page = page
+                break
+            elif url and page.has_referrer(url):
+                # for the case when root directory is loaded later, then its content files
+                if is_root_document(entry):
+                    mark_page_as_root(page, entry)
                 matched_page = page
                 break
         # if we found a page, return it
