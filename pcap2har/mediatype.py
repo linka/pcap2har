@@ -1,4 +1,6 @@
 import re
+import logging
+
 
 class MediaType(object):
     '''
@@ -10,26 +12,35 @@ class MediaType(object):
     * subtype: string, the mime subtype
     * params: {string: string}. Maybe should be {string: [string]}?
     '''
+
     # RE for parsing media types. type and subtype are alpha-numeric strings
     # possibly with '-'s. Then the optional parameter list: names are same type
     # of string as the types above, values are pretty much anything but another
     # semicolon
     mediatype_re = re.compile(
-        r'^([\w\-+.]+)/([\w\-+.]+)((?:\s*;\s*[\w\-]+=[^;]+)*)\s*$'
+        r'^([\w\-+.]+)/([\w\-+.]+)((?:\s*;\s*[\w\-]+=[^;]+)*);?\s*$'
     )
+
     # RE for parsing name-value pairs
     nvpair_re = re.compile(r'^\s*([\w\-]+)=([^;\s]+)\s*$')
-    # constructor
+
     def __init__(self, data):
         '''
         Args:
         data = string, the media type string
         '''
+        if not data:
+            logging.warning(
+                'Setting empty media type to x-unknown-content-type')
+            self.type = 'application'
+            self.subtype = 'x-unknown-content-type'
+            params = {}
+            return
         match = self.mediatype_re.match(data)
         if match:
             # get type/subtype
             self.type = match.group(1).lower()
-            self.subtype= match.group(2).lower()
+            self.subtype = match.group(2).lower()
             # params
             self.params = {}
             param_str = match.group(3) # we know this is well-formed, except for extra whitespace
@@ -42,13 +53,16 @@ class MediaType(object):
             pass
         else:
             raise ValueError('invalid media type string: ' + data)
+
     def mimeType(self):
         return '%s/%s' % (self.type, self.subtype)
+
     def __str__(self):
         result = self.mimeType()
-        for n,v in self.params.iteritems():
+        for n, v in self.params.iteritems():
             result += '; %s=%s' % (n, v)
         return result
+
     def __repr__(self):
         return 'MediaType(%s)' % self.__str__()
 

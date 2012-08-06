@@ -1,7 +1,5 @@
 import dpkt
-import logging as log
-import os
-import shutil
+import logging
 import tcp
 
 from datetime import datetime
@@ -59,7 +57,7 @@ class PcapParser(object):
             try:
                 pcap = ModifiedReader(f)
             except dpkt.dpkt.Error as e:
-                log.warning('Failed to parse pcap file %s' % filename)
+                logging.warning('Failed to parse pcap file %s' % filename)
                 return
         elif reader:
             pcap = reader
@@ -80,7 +78,7 @@ class PcapParser(object):
                                                        ts, 
                                                        packet_count,
                                                        PcapIncompletePacketError()))
-                    log.warning('ParsePcap: discarding incomplete packet, # %d' % packet_count)
+                    logging.warning('Discarding incomplete packet, #%d' % packet_count)
                     continue
                 # parse packet
                 try:
@@ -95,10 +93,21 @@ class PcapParser(object):
                 # catch errors from this packet
                 except dpkt.Error as e:
                     self.errors.append(PcapErrorRecord(packet, ts, packet_count, e))
-                    log.warning('Error parsing packet: %s. On packet #%s' %
+                    logging.warning('Error parsing packet: %s. On packet #%s' %
                                 (e, packet_count))
                 packet_count += 1
         except dpkt.dpkt.NeedData as error:
-            log.warning(error)
-            log.warning('A packet in the pcap file was too short')
+            logging.warning(error)
+            logging.warning(
+                'A packet in the pcap file was too short, packet_count=%d' %
+                packet_count)
             self.errors.append(PcapErrorRecord(None, internal_error=error))
+
+def EasyParsePcap(filename=None, reader=None):
+    '''
+    Like `PcapParser().parse(...)`, but makes and returns a PacketDispatcher for you.
+    '''
+    dispatcher = PacketDispatcher()
+    PcapParser().parse(dispatcher, filename=filename, reader=reader)
+    dispatcher.finish()
+    return dispatcher

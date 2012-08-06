@@ -4,7 +4,7 @@ HAR file.
 '''
 
 import dpkt
-import logging as log
+import logging
 
 from datetime import datetime
 
@@ -24,8 +24,8 @@ class HttpErrorRecord(object):
             (str(self.timestamp), self.internal_error) 
     def __str__(self):
         return self.__repr__()
-        
-class Entry:
+
+class Entry(object):
     '''
     represents an HTTP request/response in a form suitable for writing to a HAR
     file.
@@ -42,6 +42,7 @@ class Entry:
     * time_waiting
     * time_receiving
     '''
+
     def __init__(self, request, response):
         self.request = request
         self.response = response
@@ -55,23 +56,26 @@ class Entry:
         # calculate other timings
         self.time_blocked = -1
         self.time_dnsing = -1
-        self.time_connecting = ms_from_dpkt_time(request.ts_start -
-                                                 request.ts_connect)
-        self.time_sending = \
-            ms_from_dpkt_time(request.ts_end - request.ts_start)
-        self.time_waiting = \
-            ms_from_dpkt_time(response.ts_start - request.ts_end)
-        self.time_receiving = \
-            ms_from_dpkt_time(response.ts_end - response.ts_start)
+        self.time_connecting = (
+            ms_from_dpkt_time(request.ts_start - request.ts_connect))
+        self.time_sending = (
+            ms_from_dpkt_time(request.ts_end - request.ts_start))
+        self.time_waiting = (
+            ms_from_dpkt_time(response.ts_start - request.ts_end))
+        self.time_receiving = (
+            ms_from_dpkt_time(response.ts_end - response.ts_start))
         # check if timing calculations are consistent
-        if self.time_sending + self.time_waiting + self.time_receiving != self.total_time:
+        if (self.time_sending + self.time_waiting + self.time_receiving !=
+            self.total_time):
             pass
+
     def json_repr(self):
         '''
         return a JSON serializable python object representation of self.
         '''
         d = {
-            'startedDateTime': self.startedDateTime.isoformat() + 'Z', # assume time is in UTC
+            # Z means time is in UTC
+            'startedDateTime': self.startedDateTime.isoformat() + 'Z',
             'time': self.total_time,
             'request': self.request,
             'response': self.response,
@@ -88,6 +92,7 @@ class Entry:
         if self.pageref:
             d['pageref'] = self.pageref
         return d
+
     def add_dns(self, dns_query):
         '''
         Adds the info from the dns.Query to this entry
@@ -97,13 +102,16 @@ class Entry:
         '''
         self.time_dnsing = ms_from_dpkt_time(dns_query.duration())
 
+
 class UserAgentTracker(object):
     '''
     Keeps track of how many uses each user-agent header receives, and provides
     a function for finding the most-used one.
     '''
+
     def __init__(self):
-        self.data = {} # {user-agent string: number of uses}
+        self.data = {}  # {user-agent string: number of uses}
+
     def add(self, ua_string):
         '''
         Either increments the use-count for the user-agent string, or creates a
@@ -113,6 +121,7 @@ class UserAgentTracker(object):
             self.data[ua_string] += 1
         else:
             self.data[ua_string] = 1
+
     def dominant_user_agent(self):
         '''
         Returns the agent string with the most uses.
@@ -125,6 +134,7 @@ class UserAgentTracker(object):
             # return the string from the key-value pair with the biggest value
             return max(self.data.iteritems(), key=lambda v: v[1])[0]
 
+
 class HttpSession(object):
     '''
     Represents all http traffic from within a pcap.
@@ -135,22 +145,23 @@ class HttpSession(object):
     * flows = [http.Flow]
     * entries = [Entry], all http request/response pairs
     '''
+
     def __init__(self, packetdispatcher, drop_response_bodies=False):
         '''
         parses http.flows from packetdispatcher, and parses those for HAR info
         '''
-        self.errors = []
+	self.errors = []
         # parse http flows
-        self.flows= []
+        self.flows = []
         for flow in packetdispatcher.tcp.flowdict.itervalues():
             try:
                 self.flows.append(http.Flow(flow, drop_response_bodies))
             except http.Error as error:
-                self.errors.append(HttpErrorRecord(error))
-                log.warning(error)
+		self.errors.append(HttpErrorRecord(error))
+                logging.warning(error)
             except dpkt.dpkt.Error as error:
-                self.errors.append(HttpErrorRecord(error))
-                log.warning(error)
+		self.errors.append(HttpErrorRecord(error))
+                logging.warning(error)
         # combine the messages into a list
         pairs = reduce(lambda p, f: p+f.pairs, self.flows, [])
         # set-up
@@ -196,7 +207,7 @@ class HttpSession(object):
         '''
         d = {
             'log': {
-                'version' : '1.1',
+                'version': '1.1',
                 'creator': {
                     'name': 'pcap2har',
                     'version': '0.1'

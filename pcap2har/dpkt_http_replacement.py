@@ -7,6 +7,8 @@ fix the bug where a body is parsed for a request that shouldn't have a body."""
 
 import cStringIO
 import dpkt
+import logging
+import settings
 
 def parse_headers(f):
     """Return dict of HTTP headers parsed from a file object."""
@@ -29,6 +31,21 @@ def parse_headers(f):
             d[k] = v
     return d
 
+
+def parse_length(s, base=10):
+    """Take a string and convert to int (not long), returning 0 if invalid"""
+    try:
+        n = int(s, base)
+        # int() can actually return long, which can't be used in file.read()
+        if isinstance(n, int):
+            return n
+    except ValueError:
+        pass
+    # if s was invalid or too big (that is, int returned long)...
+    logging.warn('Invalid HTTP content/chunk length "%s", assuming 0' % s)
+    return 0
+
+
 def parse_body(f, version, headers):
     """Return HTTP body parsed from a file object, given HTTP header dict."""
     if headers.get('transfer-encoding', '').lower() == 'chunked':
@@ -39,8 +56,8 @@ def parse_body(f, version, headers):
                 sz = f.readline().split(None, 1)[0]
             except IndexError:
                 raise dpkt.UnpackError('missing chunk size')
-            n = int(sz, 16)
-            if n == 0:
+            n = parse_length(sz, 16)
+            if n == 0:  # may happen if sz is invalid
                 found_end = True
             buf = f.read(n)
             if f.readline().strip():
@@ -49,14 +66,18 @@ def parse_body(f, version, headers):
                 l.append(buf)
             else:
                 break
-        if not found_end:
+        if settings.strict_http_parse_body and not found_end:
             raise dpkt.NeedData('premature end of chunked body')
         body = ''.join(l)
     elif 'content-length' in headers:
-        n = int(headers['content-length'])
+        # Ethan K B: Have observed malformed 0,0 content lengths
+        n = parse_length(headers['content-length'])
         body = f.read(n)
         if len(body) != n:
-            raise dpkt.NeedData('short body (missing %d bytes)' % (n - len(body)))
+            logging.warn('HTTP content-length mismatch: expected %d, got %d', n,
+                         len(body))
+            if settings.strict_http_parse_body:
+                raise dpkt.NeedData('short body (missing %d bytes)' % (n - len(body)))
     else:
         # XXX - need to handle HTTP/0.9
         # BTW, this function is not called if status code is 204 or 304
@@ -167,7 +188,7 @@ class Response(Message):
         f = cStringIO.StringIO(buf)
         line = f.readline()
         l = line.strip().split(None, 2)
-        if len(l) < 2 or not l[0].startswith(self.__proto) or not l[1].isdigit():
+        if len(l) < 3 or not l[0].startswith(self.__proto) or not l[1].isdigit():
             raise dpkt.UnpackError('invalid response: %r' % line)
         self.version = l[0][len(self.__proto)+1:]
         self.status = l[1]
