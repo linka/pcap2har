@@ -4,7 +4,8 @@ HAR file.
 '''
 
 import dpkt
-import logging
+from logging import getLogger
+logging = getLogger(__name__)
 
 from datetime import datetime
 

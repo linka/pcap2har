@@ -1,6 +1,7 @@
 import re
-import logging
 
+from logging import getLogger
+logging = getLogger(__name__)
 
 class MediaType(object):
     '''

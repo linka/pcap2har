@@ -1,9 +1,11 @@
-import logging
 import dpkt
 import common as http
+
+from logging import getLogger
+logging = getLogger(__name__)
+
 from request import Request
 from response import Response
-
 
 class Flow(object):
     '''

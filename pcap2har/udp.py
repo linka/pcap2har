@@ -1,7 +1,8 @@
-import logging
 import dpkt
 import dns
 
+from logging import getLogger
+logging = getLogger(__name__)
 
 class Processor(object):
     '''

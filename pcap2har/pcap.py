@@ -1,6 +1,8 @@
 import dpkt
-import logging
 import tcp
+
+from logging import getLogger
+logging = getLogger(__name__)
 
 from datetime import datetime
 from pcaputil import *

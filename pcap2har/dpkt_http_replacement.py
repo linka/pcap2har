@@ -7,8 +7,10 @@ fix the bug where a body is parsed for a request that shouldn't have a body."""
 
 import cStringIO
 import dpkt
-import logging
 import settings
+
+from logging import getLogger
+logging = getLogger(__name__)
 
 def parse_headers(f):
     """Return dict of HTTP headers parsed from a file object."""

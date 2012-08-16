@@ -1,6 +1,7 @@
 import flow as tcp
-import logging
 
+from logging import getLogger
+logging = getLogger(__name__)
 
 class FlowBuilder(object):
     '''

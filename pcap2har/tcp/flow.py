@@ -1,4 +1,3 @@
-import logging
 import common as tcp
 
 from dpkt.tcp import *

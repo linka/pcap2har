@@ -1,5 +1,6 @@
 from operator import itemgetter, attrgetter
-import logging
+from logging import getLogger
+logging = getLogger(__name__)
 
 from ..sortedcollection import SortedCollection
 
