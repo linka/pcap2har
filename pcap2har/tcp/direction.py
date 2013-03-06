@@ -201,7 +201,8 @@ class Direction(object):
         '''
         try:
             return self.arrival_data.find_le(seq_num)[1]
-        except ValueError:
+        except ValueError as e:
+            logging.debug("seq_arrival: %s" % e)
             return None
 
     def seq_final_arrival(self, seq_num):
@@ -211,7 +212,8 @@ class Direction(object):
         '''
         try:
             return self.final_arrival_data.find_le(seq_num)[1]
-        except:
+        except Exception as e:
+            logging.debug("seq_final_arrival: %s" % e)
             return None
 
     def pad_missing_data(self):

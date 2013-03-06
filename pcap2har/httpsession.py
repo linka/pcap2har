@@ -57,16 +57,26 @@ class Entry(object):
         # calculate other timings
         self.time_blocked = -1
         self.time_dnsing = -1
+        logging.debug("req.ts_start: %s, req.ts_connect: %s, req.ts_end: %s, "\
+                      "resp.ts_start: %s, resp.ts_end: %s" % \
+                      (request.ts_start, request.ts_connect, request.ts_end, 
+                      response.ts_start, response.ts_end))
         self.time_connecting = (
-            ms_from_dpkt_time(request.ts_start - request.ts_connect))
+            ms_from_dpkt_time(request.ts_start - request.ts_connect)) \
+            if request.ts_start and request.ts_connect else None
         self.time_sending = (
-            ms_from_dpkt_time(request.ts_end - request.ts_start))
+            ms_from_dpkt_time(request.ts_end - request.ts_start)) \
+            if request.ts_end and request.ts_start else None
         self.time_waiting = (
-            ms_from_dpkt_time(response.ts_start - request.ts_end))
+            ms_from_dpkt_time(response.ts_start - request.ts_end)) \
+            if response.ts_start and request.ts_end else None
         self.time_receiving = (
-            ms_from_dpkt_time(response.ts_end - response.ts_start))
+            ms_from_dpkt_time(response.ts_end - response.ts_start))\
+            if response.ts_end and response.ts_start else None
         # check if timing calculations are consistent
-        if (self.time_sending + self.time_waiting + self.time_receiving !=
+        if (self.time_sending and self.time_waiting and self.time_receiving and self.total_time) \
+            and \
+            (self.time_sending + self.time_waiting + self.time_receiving !=
             self.total_time):
             pass
 
