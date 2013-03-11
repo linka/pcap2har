@@ -63,20 +63,22 @@ class Entry(object):
                       response.ts_start, response.ts_end))
         self.time_connecting = (
             ms_from_dpkt_time(request.ts_start - request.ts_connect)) \
-            if request.ts_start and request.ts_connect else None
+            if request.ts_start and request.ts_connect else -1
         self.time_sending = (
             ms_from_dpkt_time(request.ts_end - request.ts_start)) \
-            if request.ts_end and request.ts_start else None
+            if request.ts_end and request.ts_start else -1
         self.time_waiting = (
             ms_from_dpkt_time(response.ts_start - request.ts_end)) \
-            if response.ts_start and request.ts_end else None
+            if response.ts_start and request.ts_end else -1
         self.time_receiving = (
             ms_from_dpkt_time(response.ts_end - response.ts_start))\
-            if response.ts_end and response.ts_start else None
+            if response.ts_end and response.ts_start else -1
         # check if timing calculations are consistent
         if (self.time_sending and self.time_waiting and self.time_receiving and self.total_time) \
             and \
-            (self.time_sending + self.time_waiting + self.time_receiving !=
+            ((self.time_sending != -1 and self.time_sending or 0) + \
+            (self.time_waiting != -1 and self.time_waiting or 0) + \
+            (self.time_receiving != -1 and self.time_receiving or 0) !=
             self.total_time):
             pass
 
