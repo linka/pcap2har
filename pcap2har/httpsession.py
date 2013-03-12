@@ -56,10 +56,6 @@ class Entry(object):
         # calculate other timings
         self.time_blocked = -1
         self.time_dnsing = -1
-        logging.debug("req.ts_start: %s, req.ts_connect: %s, req.ts_end: %s, "\
-                      "resp.ts_start: %s, resp.ts_end: %s" % \
-                      (request.ts_start, request.ts_connect, request.ts_end, 
-                      response.ts_start, response.ts_end))
 
         self.time_connecting = (
             ms_from_dpkt_time_diff(request.ts_start, request.ts_connect))
