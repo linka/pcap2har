@@ -3,7 +3,8 @@ Various small, useful functions which have no other home.
 '''
 
 import dpkt
-
+import resource
+import sys
 
 # Re-implemented here only because it's missing on AppEngine.
 def inet_ntoa(packed):
@@ -68,9 +69,24 @@ def ms_from_timedelta(td):
 def ms_from_dpkt_time(td):
     '''
     Get milliseconds from a dpkt timestamp. This should probably only really be
-    done on a number gotten from subtracting two dpkt timestamps.
+    done on a number gotten from subtracting two dpkt timestamps. td could be
+    None if the packet if the packet the timestamp should have been gotten
+    from was missing, in which case -1 is returned.
     '''
+    if td is None:
+        return -1
     return int(td * 1000)
+
+
+def ms_from_dpkt_time_diff(td1, td2):
+    '''
+    Get milliseconds from the difference of two dpkt timestamps.  Either
+    timestamp could be None if packets are missing, in which case -1 is
+    returned.
+    '''
+    if td1 is None or td2 is None:
+        return -1
+    return ms_from_dpkt_time(td1 - td2)
 
 
 class ModifiedReader(object):
@@ -161,3 +177,9 @@ class FakeFlow(object):
     def __init__(self, fwd, rev):
         self.fwd = fwd
         self.rev = rev
+
+def print_rusage():
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform == 'darwin':
+        rss /= 1024  # Mac OSX returns rss in bytes, not KiB
+    print 'max_rss:', rss, 'KiB'

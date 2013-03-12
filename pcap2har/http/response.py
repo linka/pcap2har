@@ -2,6 +2,8 @@ import gzip
 import zlib
 import cStringIO
 from base64 import encodestring as b64encode
+from logging import getLogger
+logging = getLogger(__name__)
 
 from .. import dpkt_http_replacement as dpkt_http
 from ..mediatype import MediaType
@@ -66,13 +68,11 @@ class Response(message.Message):
         '''
         Clear response body to save memory
 
-        Sets to None the body attributes of self and self.msg, and
-        maybe tcpdir, too. Of course, they can't be GC'd if there
-        are any other references.
+        http.Flow has to do most of the work (after any other responses are
+        parsed), here we just want to get rid of any references.
         '''
         self.body = self.raw_body = None
         self.msg.body = None
-        #self.tcpdir.clear_data() # clear stream data, not timing, etc
 
     def handle_compression(self):
         '''

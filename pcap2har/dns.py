@@ -1,5 +1,5 @@
-from logging import getLogger
-logging = getLogger(__name__)
+import logging
+
 
 class Packet(object):
     '''

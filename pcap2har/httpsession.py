@@ -9,7 +9,7 @@ logging = getLogger(__name__)
 
 from datetime import datetime
 
-from pcaputil import ms_from_timedelta, ms_from_dpkt_time
+from pcaputil import ms_from_dpkt_time, ms_from_dpkt_time_diff
 from pagetracker import PageTracker
 import http
 import settings
@@ -48,12 +48,11 @@ class Entry(object):
         self.request = request
         self.response = response
         self.pageref = None
-        self.ts_start = int(request.ts_connect*1000)
-        self.startedDateTime = datetime.utcfromtimestamp(request.ts_connect)
-        endedDateTime = datetime.utcfromtimestamp(response.ts_end)
-        self.total_time = ms_from_timedelta(
-            endedDateTime - self.startedDateTime # plus connection time, someday
-        )
+        self.ts_start = ms_from_dpkt_time(request.ts_connect)
+        if request.ts_connect is None:
+            self.startedDateTime = None
+        else:
+            self.startedDateTime = datetime.utcfromtimestamp(request.ts_connect)
         # calculate other timings
         self.time_blocked = -1
         self.time_dnsing = -1
@@ -61,34 +60,30 @@ class Entry(object):
                       "resp.ts_start: %s, resp.ts_end: %s" % \
                       (request.ts_start, request.ts_connect, request.ts_end, 
                       response.ts_start, response.ts_end))
+
         self.time_connecting = (
-            ms_from_dpkt_time(request.ts_start - request.ts_connect)) \
-            if request.ts_start and request.ts_connect else -1
+            ms_from_dpkt_time_diff(request.ts_start, request.ts_connect))
         self.time_sending = (
-            ms_from_dpkt_time(request.ts_end - request.ts_start)) \
-            if request.ts_end and request.ts_start else -1
-        self.time_waiting = (
-            ms_from_dpkt_time(response.ts_start - request.ts_end)) \
-            if response.ts_start and request.ts_end else -1
-        self.time_receiving = (
-            ms_from_dpkt_time(response.ts_end - response.ts_start))\
-            if response.ts_end and response.ts_start else -1
-        # check if timing calculations are consistent
-        if (self.time_sending and self.time_waiting and self.time_receiving and self.total_time) \
-            and \
-            ((self.time_sending != -1 and self.time_sending or 0) + \
-            (self.time_waiting != -1 and self.time_waiting or 0) + \
-            (self.time_receiving != -1 and self.time_receiving or 0) !=
-            self.total_time):
-            pass
+            ms_from_dpkt_time_diff(request.ts_end, request.ts_start))
+        if response is not None:
+            self.time_waiting = (
+                ms_from_dpkt_time_diff(response.ts_start, request.ts_end))
+            self.time_receiving = (
+                ms_from_dpkt_time_diff(response.ts_end, response.ts_start))
+            # TODO: what and why endedDateTime is?
+            #endedDateTime = datetime.utcfromtimestamp(response.ts_end)
+            self.total_time = ms_from_dpkt_time_diff(response.ts_end, request.ts_connect)
+        else:
+            # this can happen if the request never gets a response
+            self.time_waiting = -1
+            self.time_receiving = -1
+            self.total_time = -1
 
     def json_repr(self):
         '''
         return a JSON serializable python object representation of self.
         '''
         d = {
-            # Z means time is in UTC
-            'startedDateTime': self.startedDateTime.isoformat() + 'Z',
             'time': self.total_time,
             'request': self.request,
             'response': self.response,
@@ -102,6 +97,9 @@ class Entry(object):
             },
             'cache': {},
         }
+        if self.startedDateTime:
+            # Z means time is in UTC
+            d['startedDateTime'] = self.startedDateTime.isoformat() + 'Z'
         if self.pageref:
             d['pageref'] = self.pageref
         return d
@@ -161,19 +159,19 @@ class HttpSession(object):
 
     def __init__(self, packetdispatcher, drop_response_bodies=False):
         '''
-        parses http.flows from packetdispatcher, and parses those for HAR info
+        Parses http.flows from packetdispatcher, and parses those for HAR info
         '''
-	self.errors = []
+        self.errors = []
         # parse http flows
         self.flows = []
-        for flow in packetdispatcher.tcp.flowdict.itervalues():
+        for flow in packetdispatcher.tcp.flows():
             try:
                 self.flows.append(http.Flow(flow, drop_response_bodies))
             except http.Error as error:
-		self.errors.append(HttpErrorRecord(error))
+                self.errors.append(HttpErrorRecord(error))
                 logging.warning(error)
             except dpkt.dpkt.Error as error:
-		self.errors.append(HttpErrorRecord(error))
+                self.errors.append(HttpErrorRecord(error))
                 logging.warning(error)
         # combine the messages into a list
         pairs = reduce(lambda p, f: p+f.pairs, self.flows, [])
@@ -197,8 +195,9 @@ class HttpSession(object):
             # if msg.request has a referer, keep track of that, too
             if self.page_tracker:
                 entry.pageref = self.page_tracker.getref(entry)
-            # add it to the list
-            self.entries.append(entry)
+            # add it to the list, if we're supposed to keep it.
+            if entry.response or settings.keep_unfulfilled_requests:
+                self.entries.append(entry)
         self.user_agent = self.user_agents.dominant_user_agent()
         # handle DNS AFTER sorting
         # this algo depends on first appearance of a name

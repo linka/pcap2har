@@ -47,12 +47,14 @@ class Page(object):
         self.referrers.add(entry.request.url)
 
     def json_repr(self):
-        return {
+        d = {
             'id': self.pageref,
-            'startedDateTime': self.startedDateTime.isoformat() + 'Z',
             'title': self.title,
             'pageTimings': default_page_timings
         }
+        if self.startedDateTime:
+            d['startedDateTime'] = self.startedDateTime.isoformat() + 'Z'
+        return d
 
 
 default_page_timings = {
@@ -73,11 +75,13 @@ def is_root_document(entry):
     guesses whether the entry is from the root document of a web page
     '''
     # guess based on media type
-    mt = entry.response.mediaType
-    if mt.type == 'text':
-        if mt.subtype in ['html', 'xhtml', 'xml']:
-            # probably...
-            return True
+    if entry.response:  # might be None
+        mt = entry.response.mediaType
+        if mt.type == 'text':
+            if mt.subtype in ['html', 'xhtml', 'xml']:
+                # probably...
+                return True
+    # else, guess by request url?
     return False
 
 

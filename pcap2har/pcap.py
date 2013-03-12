@@ -113,3 +113,4 @@ def EasyParsePcap(filename=None, reader=None):
     PcapParser().parse(dispatcher, filename=filename, reader=reader)
     dispatcher.finish()
     return dispatcher
+

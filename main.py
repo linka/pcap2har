@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 '''
 Main program that converts pcaps to HAR's.
@@ -17,6 +17,11 @@ from pcap2har import har
 from pcap2har import tcp
 from pcap2har import settings
 from pcap2har.packetdispatcher import PacketDispatcher
+<<<<<<< HEAD
+=======
+from pcap2har.pcaputil import print_rusage
+
+>>>>>>> upstream/master
 
 # get cmdline args/options
 parser = optparse.OptionParser(
@@ -26,22 +31,32 @@ parser.add_option('--no-pages', action='store_false',
                   dest='pages', default=True)
 parser.add_option('-d', '--drop-bodies', action='store_true',
                   dest='drop_bodies', default=False)
+parser.add_option('-k', '--keep-unfulfilled-requests', action='store_true',
+                  dest='keep_unfulfilled', default=False)
 parser.add_option('-r', '--resource-usage', action='store_true',
                   dest='resource_usage', default=False)
 parser.add_option('--pad_missing_tcp_data', action='store_true',
                   dest='pad_missing_tcp_data', default=False)
 parser.add_option('--strict-http-parsing', action='store_true',
                   dest='strict_http_parsing', default=False)
+<<<<<<< HEAD
+=======
+parser.add_option('-l', '--log', dest='logfile', default='pcap2har.log')
+>>>>>>> upstream/master
 options, args = parser.parse_args()
 
 # copy options to settings module
 settings.process_pages = options.pages
 settings.drop_bodies = options.drop_bodies
+<<<<<<< HEAD
+=======
+settings.keep_unfulfilled_requests = options.keep_unfulfilled
+>>>>>>> upstream/master
 settings.pad_missing_tcp_data = options.pad_missing_tcp_data
 settings.strict_http_parse_body = options.strict_http_parsing
 
 # setup logs
-logging.basicConfig(filename='pcap2har.log', level=logging.INFO)
+logging.basicConfig(filename=options.logfile, level=logging.INFO)
 
 # get filenames, or bail out with usage error
 if len(args) == 2:
@@ -62,12 +77,15 @@ dispatcher = pcap.EasyParsePcap(filename=inputfile)
 session = httpsession.HttpSession(dispatcher)
 
 logging.info('Flows=%d. HTTP pairs=%d' % (len(session.flows), len(session.entries)))
+<<<<<<< HEAD
 
 def print_rusage():
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     if sys.platform == 'darwin':
         rss /= 1024  # Mac OSX returns rss in bytes, not KiB
     print 'max_rss:', rss, 'KiB'
+=======
+>>>>>>> upstream/master
 
 #write the HAR file
 with open(outputfile, 'w') as f:

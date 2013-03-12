@@ -1,4 +1,5 @@
 import dpkt
+
 import common as http
 
 from logging import getLogger
@@ -6,6 +7,8 @@ logging = getLogger(__name__)
 
 from request import Request
 from response import Response
+from .. import settings
+
 
 class Flow(object):
     '''
@@ -36,10 +39,16 @@ class Flow(object):
             if not success:
                 # flow is not HTTP
                 raise HTTPError('TCP Flow does not contain HTTP')
+        # now optionally clear the data on tcpflow
+        if settings.drop_bodies:
+            tcpflow.fwd.clear_data()
+            tcpflow.rev.clear_data()
         # match up requests with nearest response that occured after them
         # first request is the benchmark; responses before that
         # are irrelevant for now
         self.pairs = []
+        # determine a list of responses that we can match up with requests,
+        # padding the list with None where necessary.
         try:
             # find the first response to a request we know about,
             # that is, the first response after the first request
@@ -47,6 +56,10 @@ class Flow(object):
                 lambda response: response.ts_start > requests[0].ts_start,
                 responses
             )
+        except LookupError:
+            # no responses at all
+            pairable_responses = [None for i in requests]
+        else:
             # these are responses that match up with our requests
             pairable_responses = responses[first_response_index:]
             # if there are more requests than responses...
@@ -55,25 +68,20 @@ class Flow(object):
                 pairable_responses.extend(
                     [None for i in range(len(requests) - len(pairable_responses))]
                 )
-            # if there are more responses, we would just ignore them anyway,
-            # which zip does for us
-            # create MessagePair's
-            connected = False  # if conn. timing has been added to a request yet
-            for req, resp in zip(requests, responses):
-                if not req:
-                    logging.warning('Request is missing.')
-                    continue
-                if not connected and tcpflow.handshake:
-                    req.ts_connect = tcpflow.handshake[0].ts
-                    connected = True
-                else:
-                    req.ts_connect = req.ts_start
-                self.pairs.append(MessagePair(req, resp))
-        except LookupError:
-            # there were no responses after the first request
-            # there's nothing we can do
-            logging.warning('Request has no response.')
-
+        # if there are more responses, we would just ignore them anyway,
+        # which zip does for us
+        # create MessagePair's
+        connected = False  # if conn. timing has been added to a request yet
+        for req, resp in zip(requests, pairable_responses):
+            if not req:
+                logging.warning('Request is missing.')
+                continue
+            if not connected and tcpflow.handshake:
+                req.ts_connect = tcpflow.handshake[0].ts
+                connected = True
+            else:
+                req.ts_connect = req.ts_start
+            self.pairs.append(MessagePair(req, resp))
 
 class MessagePair(object):
     '''
@@ -109,7 +117,7 @@ def gather_messages(MessageClass, tcpdir, spec_args=None):
 
     # while there's data left
     while pointer < len(tcpdir.data):
-        curr_data = tcpdir.data[pointer:pointer+200]  # debug var
+        #curr_data = tcpdir.data[pointer:pointer+200]  # debug var
         try:
             msg = MessageClass(tcpdir, pointer, *spec_args)
         except dpkt.Error as error:  # if the message failed
