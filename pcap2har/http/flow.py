@@ -38,7 +38,7 @@ class Flow(object):
                                                          drop_response_bodies)
             if not success:
                 # flow is not HTTP
-                raise HTTPError('TCP Flow does not contain HTTP')
+                raise http.Error('TCP Flow does not contain HTTP')
         # now optionally clear the data on tcpflow
         if settings.drop_bodies:
             tcpflow.fwd.clear_data()

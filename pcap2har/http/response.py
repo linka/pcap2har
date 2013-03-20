@@ -22,7 +22,7 @@ try:
         from ..BeautifulSoup import UnicodeDammit
 except ImportError:
     UnicodeDammit = None
-    log.warning('Can\'t find BeautifulSoup, unicode is more likely to be '
+    logging.warning('Can\'t find BeautifulSoup, unicode is more likely to be '
                 'misinterpreted')
 
 class Response(message.Message):

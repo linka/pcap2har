@@ -1,5 +1,6 @@
 import dpkt
-
+from logging import getLogger
+logging = getLogger(__name__)
 
 def detect_handshake(packets):
     '''
@@ -10,7 +11,7 @@ def detect_handshake(packets):
     if len(packets) < 3:
         return False
     if len(packets) > 3:
-        log.error('too many packets for detect_handshake')
+        logging.error('too many packets for detect_handshake')
         return False
     syn, synack, ack = packets
     fwd_seq = None
