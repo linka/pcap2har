@@ -6,9 +6,11 @@ HAR file.
 import dpkt
 from logging import getLogger
 logging = getLogger(__name__)
+import math
 
 from datetime import datetime
-
+from decimal import Decimal, getcontext, ROUND_HALF_UP
+getcontext().rounding = ROUND_HALF_UP
 from pcaputil import ms_from_dpkt_time, ms_from_dpkt_time_diff
 from pagetracker import PageTracker
 import http
@@ -49,6 +51,7 @@ class Entry(object):
         self.response = response
         self.pageref = None
         self.ts_start = ms_from_dpkt_time(request.ts_connect)
+
         if request.ts_connect is None:
             self.startedDateTime = None
         else:
@@ -56,40 +59,55 @@ class Entry(object):
         # calculate other timings
         self.time_blocked = -1
         self.time_dnsing = -1
+        self.time_waiting = -1
+        self.time_receiving = -1
+        self.total_time = -1
 
         self.time_connecting = (
-            ms_from_dpkt_time_diff(request.ts_start, request.ts_connect))
+            ms_from_dpkt_time_diff(request.ts_connect_end, request.ts_connect))
+        self.time_gap = (
+            ms_from_dpkt_time_diff(request.ts_start, request.ts_connect_end))
         self.time_sending = (
             ms_from_dpkt_time_diff(request.ts_end, request.ts_start))
+
         if response is not None:
             self.time_waiting = (
                 ms_from_dpkt_time_diff(response.ts_start, request.ts_end))
             self.time_receiving = (
                 ms_from_dpkt_time_diff(response.ts_end, response.ts_start))
-            # TODO: what and why endedDateTime is?
-            #endedDateTime = datetime.utcfromtimestamp(response.ts_end)
-            self.total_time = ms_from_dpkt_time_diff(response.ts_end, request.ts_connect)
-        else:
-            # this can happen if the request never gets a response
-            self.time_waiting = -1
-            self.time_receiving = -1
-            self.total_time = -1
+            if request.ts_connect:
+                self.total_time = ms_from_dpkt_time_diff(response.ts_end, request.ts_connect)
 
     def json_repr(self):
         '''
         return a JSON serializable python object representation of self.
         '''
+        def to_int(num):
+            if isinstance(num, int):
+                return num
+            elif isinstance(num, float):
+                return int(round(num))
+            elif isinstance(num, Decimal):
+                return int(num.to_integral_value())
+
+        total_page_time = self.total_time 
+        if self.time_dnsing != -1 and total_page_time != -1:
+            total_page_time = total_page_time + self.time_dnsing
+        if self.time_blocked != -1 and total_page_time != -1:
+            total_page_time = total_page_time + self.time_blocked
+ 
         d = {
-            'time': self.total_time,
+            'time': to_int(total_page_time),
             'request': self.request,
             'response': self.response,
             'timings': {
-                'blocked': self.time_blocked,
-                'dns': self.time_dnsing,
-                'connect': self.time_connecting,
-                'send': self.time_sending,
-                'wait': self.time_waiting,
-                'receive': self.time_receiving
+                'blocked': to_int(self.time_blocked),
+                'dns': to_int(self.time_dnsing),
+                'connect': to_int(self.time_connecting),
+                '_gap': to_int(self.time_gap),
+                'send': to_int(self.time_sending),
+                'wait': to_int(self.time_waiting),
+                'receive': to_int(self.time_receiving)
             },
             'cache': {},
         }
@@ -107,8 +125,10 @@ class Entry(object):
         Assumes that the dns.Query represents the DNS query required to make
         the request. Or something like that.
         '''
-        self.time_dnsing = ms_from_dpkt_time(dns_query.duration())
-
+        if self.time_dnsing == -1:
+            self.time_dnsing = ms_from_dpkt_time(dns_query.duration())
+        else:
+            self.time_dnsing += ms_from_dpkt_time(dns_query.duration())
 
 class UserAgentTracker(object):
     '''
@@ -205,8 +225,10 @@ class HttpSession(object):
             # if this is the first time seeing the name
             if name not in names_mentioned:
                 if name in dns.by_hostname:
-                    # TODO: handle multiple DNS queries for now just use last one
-                    entry.add_dns(dns.by_hostname[name][-1])
+                    # Handle multiple DNS queries for now just use last one, 
+                    # i.e. for IPv4/IPv6 addresses
+                    for d in dns.by_hostname[name]:
+                        entry.add_dns(d)
                 names_mentioned.add(name)
 
     def json_repr(self):

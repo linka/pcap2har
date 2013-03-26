@@ -78,9 +78,11 @@ class Flow(object):
                 continue
             if not connected and tcpflow.handshake:
                 req.ts_connect = tcpflow.handshake[0].ts
+                req.ts_connect_end = tcpflow.handshake[2].ts
                 connected = True
             else:
                 req.ts_connect = req.ts_start
+                req.ts_connect_end = req.ts_start
             self.pairs.append(MessagePair(req, resp))
 
 class MessagePair(object):

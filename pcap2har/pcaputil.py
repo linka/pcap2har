@@ -75,7 +75,7 @@ def ms_from_dpkt_time(td):
     '''
     if td is None:
         return -1
-    return int(td * 1000)
+    return (td * 1000)
 
 
 def ms_from_dpkt_time_diff(td1, td2):
@@ -154,7 +154,6 @@ class ModifiedReader(object):
             hdr = self.__ph(buf)
             buf = self.__f.read(hdr.caplen)
             yield (hdr.tv_sec + (hdr.tv_usec / 1000000.0), buf, hdr)
-
 
 class FakeStream(object):
     '''
