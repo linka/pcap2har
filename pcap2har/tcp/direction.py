@@ -197,7 +197,7 @@ class Direction(object):
 
     def seq_arrival(self, seq_num):
         '''
-        returns the packet in which the specified sequence number first arrived.
+        Returns the packet in which the specified sequence number first arrived.
         '''
         try:
             return self.arrival_data.find_le(seq_num)[1]

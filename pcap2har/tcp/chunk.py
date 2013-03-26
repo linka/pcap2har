@@ -19,7 +19,8 @@ class Chunk(object):
     def merge(self, new, new_seq_callback=None):
         '''
         Attempts to merge the packet or chunk with the existing data. Returns
-        details of the operation's success or failure.
+        details of the operation's success or failure. It is generally necessary 
+        for overlapping TCP packets.
 
         Args:
         new = TCPPacket or TCPChunk
@@ -75,6 +76,9 @@ class Chunk(object):
         added_front_data = False
         added_back_data = False
         # front data?
+        # /  new \
+        # |---|---|---| 
+        #     \ old  / 
         if (seq.lt(newseq[0], self.seq_start) and
             seq.lte(self.seq_start, newseq[1])):
             new_data_length = seq.subtract(self.seq_start, newseq[0])
@@ -87,6 +91,9 @@ class Chunk(object):
             if callback:
                 callback(newseq[0])
         # back data?
+        #      /  new \
+        # |---|---|---| 
+        #  \ old  / 
         if seq.lte(newseq[0], self.seq_end) and seq.lt(self.seq_end, newseq[1]):
             new_data_length = seq.subtract(newseq[1], self.seq_end)
             self.data += newdata[-new_data_length:]
@@ -99,6 +106,9 @@ class Chunk(object):
                 back_seq_start = newseq[1] - new_data_length
                 callback(back_seq_start)
         # completely inside?
+        #      /new\
+        # |---|----|---| 
+        #  \   old    / 
         if (seq.lte(self.seq_start, newseq[0]) and
             seq.lte(newseq[1], self.seq_end)):
             overlapped = True
