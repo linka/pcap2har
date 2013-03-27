@@ -1,3 +1,5 @@
+from pcaputil import to_int
+
 class Page(object):
     '''
     Members:
@@ -22,6 +24,7 @@ class Page(object):
         self.startedDateTime = entry.startedDateTime
         self.last_entry = entry
         self.user_agent = entry.request.msg.headers.get('user-agent')
+        self.network_load_time = -1
         # url, title, etc.
         if is_root_doc:
             mark_page_as_root(self, entry)
@@ -54,6 +57,8 @@ class Page(object):
         }
         if self.startedDateTime:
             d['startedDateTime'] = self.startedDateTime.isoformat() + 'Z'
+        if self.network_load_time:
+            d['pageTimings']['_networkLoadTime'] = to_int(self.network_load_time)
         return d
 
 

@@ -6,12 +6,26 @@ import dpkt
 import resource
 import sys
 
+from decimal import Decimal, getcontext, ROUND_HALF_UP
+getcontext().rounding = ROUND_HALF_UP
+
 # Re-implemented here only because it's missing on AppEngine.
 def inet_ntoa(packed):
     '''Custom implementation of inet_ntoa'''
     if not isinstance(packed, str) or len(packed) != 4:
         raise ValueError('Argument to inet_ntoa must a string of length 4')
     return '.'.join(str(ord(c)) for c in packed)
+
+def to_int(num):
+    '''
+    Rounds with half-up method and converts number to integer. 
+    '''
+    if isinstance(num, int):
+        return num
+    elif isinstance(num, float):
+        return int(round(num))
+    elif isinstance(num, Decimal):
+        return int(num.to_integral_value())
 
 
 def friendly_tcp_flags(flags):

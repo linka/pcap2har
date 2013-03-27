@@ -9,9 +9,7 @@ logging = getLogger(__name__)
 import math
 
 from datetime import datetime
-from decimal import Decimal, getcontext, ROUND_HALF_UP
-getcontext().rounding = ROUND_HALF_UP
-from pcaputil import ms_from_dpkt_time, ms_from_dpkt_time_diff
+from pcaputil import ms_from_dpkt_time, ms_from_dpkt_time_diff, to_int
 from pagetracker import PageTracker
 import http
 import settings
@@ -37,7 +35,8 @@ class Entry(object):
     * response = http.Response
     * page_ref = string
     * startedDateTime = python datetime
-    * total_time = from sending of request to end of response, milliseconds
+    * time = from sending of request to end of response, milliseconds
+    * total_time = time, including DNS, blocking and request/resonse time, milliseconds
     * time_blocked
     * time_dnsing
     * time_connecting
@@ -61,6 +60,7 @@ class Entry(object):
         self.time_dnsing = -1
         self.time_waiting = -1
         self.time_receiving = -1
+        self.time = -1
         self.total_time = -1
 
         self.time_connecting = (
@@ -76,28 +76,14 @@ class Entry(object):
             self.time_receiving = (
                 ms_from_dpkt_time_diff(response.ts_end, response.ts_start))
             if request.ts_connect:
-                self.total_time = ms_from_dpkt_time_diff(response.ts_end, request.ts_connect)
+                self.time = ms_from_dpkt_time_diff(response.ts_end, request.ts_connect)
 
     def json_repr(self):
         '''
         return a JSON serializable python object representation of self.
         '''
-        def to_int(num):
-            if isinstance(num, int):
-                return num
-            elif isinstance(num, float):
-                return int(round(num))
-            elif isinstance(num, Decimal):
-                return int(num.to_integral_value())
-
-        total_page_time = self.total_time 
-        if self.time_dnsing != -1 and total_page_time != -1:
-            total_page_time = total_page_time + self.time_dnsing
-        if self.time_blocked != -1 and total_page_time != -1:
-            total_page_time = total_page_time + self.time_blocked
- 
         d = {
-            'time': to_int(total_page_time),
+            'time': to_int(self.total_time),
             'request': self.request,
             'response': self.response,
             'timings': {
@@ -129,6 +115,17 @@ class Entry(object):
             self.time_dnsing = ms_from_dpkt_time(dns_query.duration())
         else:
             self.time_dnsing += ms_from_dpkt_time(dns_query.duration())
+    
+    def calc_total_time(self):
+        ''' 
+        Calculates total_time, including DNS, blocking and request/response time.
+        '''
+        total_time = self.time
+        if self.time_dnsing != -1 and total_time != -1:
+            total_time = total_time + self.time_dnsing
+        if self.time_blocked != -1 and total_time != -1:
+            total_time = total_time + self.time_blocked
+        self.total_time = total_time
 
 class UserAgentTracker(object):
     '''
@@ -220,6 +217,7 @@ class HttpSession(object):
         # being the actual first mention
         names_mentioned = set()
         dns = packetdispatcher.udp.dns
+        page_times = {}
         for entry in self.entries:
             name = entry.request.host
             # if this is the first time seeing the name
@@ -230,6 +228,17 @@ class HttpSession(object):
                     for d in dns.by_hostname[name]:
                         entry.add_dns(d)
                 names_mentioned.add(name)
+            entry.calc_total_time()
+            # handle page network load time
+            p_time = page_times.get(entry.pageref, (entry.ts_start, 0))
+            page_times[entry.pageref] = (min(p_time[0], entry.ts_start), 
+                                         max(p_time[1], entry.ts_start + entry.total_time))
+
+        # write page network load times
+        for page in self.page_tracker.pages:
+            p_time = page_times.get(page.pageref, None)
+            if p_time:
+                page.network_load_time = p_time[1] - p_time[0] 
 
     def json_repr(self):
         '''
